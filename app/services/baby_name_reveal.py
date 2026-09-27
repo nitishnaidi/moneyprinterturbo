@@ -37,7 +37,7 @@ def _bg(t):
     yy,xx=np.mgrid[0:HEIGHT,0:WIDTH]; x=xx/WIDTH; y=yy/HEIGHT
     glow=np.exp(-(((x-(.5+.04*math.sin(t*.4)))/.43)**2+((y-.48)/.58)**2))
     arr=np.dstack(((68+110*glow),(27+62*glow),(48+55*glow))).clip(0,255).astype(np.uint8)
-    base=Image.fromarray(arr,"RGB").convert("RGBA")
+    base=Image.fromarray(arr).convert("RGBA")
     p=Image.new("RGBA",(WIDTH,HEIGHT)); d=ImageDraw.Draw(p)
     for i in range(46):
         px=int((i*263+28*math.sin(t*.5+i))%WIDTH); py=int((i*137-t*(13+i%7))%HEIGHT); r=2+i%4
@@ -112,16 +112,23 @@ def _draw_continuous_story(layer, t):
     persistent_name(FATHER, 195, "father")
     persistent_name(MOTHER, 535, "mother")
 
-    # Small unobtrusive cue for the active transformation, no arrow or scene card.
+    # V2-style mapping cue, now drawn only as an overlay on the persistent names.
+    # The names themselves never refresh or move. Mapped glyphs dissolve in-place.
     active = None
-    for i, start in enumerate((2.0, 3.45, 4.9)):
+    starts = (2.0, 3.45, 4.9)
+    for i, start in enumerate(starts):
         if start <= t < start + .9:
             active = i
             break
     if active is not None:
         left, right = PAIRINGS[active]
-        cue_alpha = int(190 * min(_ease((t-(2.0,3.45,4.9)[active])/.18), 1))
-        _center(d, f"{left}  +  {right}", 760, _font(35), (255, 220, 175, cue_alpha))
+        local = t - starts[active]
+        cue_alpha = int(220 * min(_ease(local/.16), _ease((.9-local)/.16), 1))
+        arrow_font = _font(46, True)
+        label_font = _font(34, True)
+        # Keep the mapping indication visually separate from the source names.
+        _center(d, f"{left}     →     {right}", 760, arrow_font, (255, 222, 166, cue_alpha))
+        _center(d, "mapped letters disappear", 825, label_font, (255, 232, 205, int(cue_alpha*.72)))
 
     # Once all mapped characters are gone, the original positions visibly contain
     # only ITI and KA. Hold that state before convergence.
