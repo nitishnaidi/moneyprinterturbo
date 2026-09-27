@@ -21,6 +21,14 @@ class TestBabyNameReveal(unittest.TestCase):
             ),
         )
 
+    def test_exact_removal_indices(self):
+        mother = reveal.MOTHER
+        self.assertEqual("".join(mother[i] for i in (0, 1, 2)), "SNE")
+        self.assertEqual("".join(mother[i] for i in (3, 4, 5)), "HAN")
+        self.assertEqual("".join(mother[i] for i in (7, 8, 9)), "ITH")
+        removed = {0, 1, 2, 3, 4, 5, 7, 8, 9}
+        self.assertEqual("".join(ch for i, ch in enumerate(mother) if i not in removed), "KA")
+
     def test_output_contract(self):
         self.assertEqual((reveal.WIDTH, reveal.HEIGHT), (1920, 1080))
         self.assertEqual(reveal.FPS, 30)
