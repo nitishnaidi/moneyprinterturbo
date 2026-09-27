@@ -60,49 +60,110 @@ def _name(layer,text,y,alpha,hi=()):
         x+=w+8
     return pos
 
-def _intro(layer,t):
-    if t>=2.05:return
-    a=int(255*min(_ease(t/.55),_ease((2.05-t)/.25),1)); d=ImageDraw.Draw(layer)
-    _center(d,"FATHER",190,_font(29,True),(255,207,155,a)); _name(layer,FATHER,240,a)
-    _center(d,"MOTHER",500,_font(29,True),(255,207,155,a)); _name(layer,MOTHER,550,a)
-    _center(d,"Two names. One little miracle.",790,_font(40),(255,230,211,a))
+def _draw_continuous_story(layer, t):
+    """Single continuous shot: names persist and selected glyphs dissolve in place."""
+    d = ImageDraw.Draw(layer)
+    # Gentle fade-in only. No scene-level fade-outs or card refreshes.
+    alpha = int(255 * min(_ease(t / .55), 1.0))
+    _center(d, "FATHER", 145, _font(27, True), (255, 205, 150, int(alpha * .82)))
+    _center(d, "MOTHER", 485, _font(27, True), (255, 205, 150, int(alpha * .82)))
 
-def _curve(layer,p0,p2,progress,alpha):
-    d=ImageDraw.Draw(layer); p1=((p0[0]+p2[0])/2,min(p0[1],p2[1])-155); pts=[]
-    for i in range(max(2,int(38*progress))):
-        u=i/37; v=1-u; pts.append((v*v*p0[0]+2*v*u*p1[0]+u*u*p2[0],v*v*p0[1]+2*v*u*p1[1]+u*u*p2[1]))
-    if len(pts)>1:
-        d.line(pts,fill=(255,176,88,70),width=14); d.line(pts,fill=(255,229,170,alpha),width=3)
+    # Removal windows. A mapped glyph glows, then dissolves while every other glyph
+    # stays anchored to its original location. This makes the derivation readable.
+    events = (
+        (2.0, "father", (0,)),       # N
+        (2.0, "mother", (0, 1, 2)), # SNE
+        (3.45, "father", (4,)),      # S
+        (3.45, "mother", (3, 4, 5)), # HAN
+        (4.9, "father", (5,)),       # H
+        (4.9, "mother", (6, 7, 8)),  # ITH
+    )
 
-def _extract(layer,t):
-    starts=(2.05,3.45,4.85); active=next((i for i,s in enumerate(starts) if s<=t<s+1.4),None)
-    if active is None:return
-    s=starts[active]; local=t-s; a=int(255*min(_ease(local/.18),_ease((1.4-local)/.16),1)); d=ImageDraw.Draw(layer)
-    fl,ms,fr,mr=STAGES[active]; fi=[FATHER.index(fl)]; mi=list(range(MOTHER.find(ms),MOTHER.find(ms)+len(ms)))
-    _center(d,"FATHER",130,_font(27,True),(255,205,150,a)); fp=_name(layer,FATHER,175,a,fi)
-    _center(d,"MOTHER",455,_font(27,True),(255,205,150,a)); mp=_name(layer,MOTHER,500,a,mi)
-    fx=fp[fi[0]][0]+fp[fi[0]][1]/2; mx=(mp[mi[0]][0]+mp[mi[-1]][0]+mp[mi[-1]][1])/2
-    _curve(layer,(fx,295),(mx,495),_ease((local-.15)/.55),a)
-    if local>.62:_center(d,f"remaining   {fr}   +   {mr}",770,_font(48,True),(255,224,178,int(a*min(1,(local-.62)/.2))))
+    def glyph_alpha(group, idx):
+        a = alpha
+        glow = False
+        for start, event_group, indices in events:
+            if group != event_group or idx not in indices:
+                continue
+            if t < start:
+                return a, False
+            if start <= t < start + .42:
+                return a, True
+            if start + .42 <= t < start + .88:
+                p = _ease((t - start - .42) / .46)
+                return int(a * (1 - p)), True
+            return 0, False
+        return a, glow
 
-def _assemble(layer,t):
-    if t<6.25 or t>=8.0:return
-    local=t-6.25; d=ImageDraw.Draw(layer)
-    if local<.72:
-        a=int(255*min(local/.2,1)); _center(d,"The letters that remained...",235,_font(38),(255,225,205,a))
-        _glow(layer,(710,500),FATHER_REMAINDER,_font(112,True),a,"mm"); _glow(layer,(1210,500),MOTHER_REMAINDER,_font(112,True),a,"mm")
-        _center(d,"+",445,_font(80,True),(255,216,155,a)); return
-    p=_ease((local-.72)/.85); font=_font(168,True); widths=[d.textlength(ch,font=font) for ch in TODDLER]; gap=18
-    x=(WIDTH-(sum(widths)+gap*4))/2; src=[(660,470),(735,470),(810,470),(1160,470),(1240,470)]
-    for i,(ch,w) in enumerate(zip(TODDLER,widths)):
-        sx,sy=src[i]; px=sx+(x-sx)*p; _glow(layer,(px,430),ch,font,255); x+=w+gap
+    def persistent_name(text, y, group):
+        font = _font(102, True)
+        widths = [d.textlength(ch, font=font) for ch in text]
+        gap = 8
+        x = (WIDTH - (sum(widths) + gap * (len(text)-1))) / 2
+        for i, (ch, width) in enumerate(zip(text, widths)):
+            ga, glowing = glyph_alpha(group, i)
+            if ga > 0:
+                if glowing:
+                    _glow(layer, (x, y), ch, font, ga)
+                else:
+                    d.text((x, y), ch, font=font, fill=(255, 239, 219, ga))
+            x += width + gap
 
-def _hero(layer,t):
-    if t<8:return
-    local=t-8; a=int(255*min(local/.35,1)); d=ImageDraw.Draw(layer)
-    halo=Image.new("RGBA",layer.size); hd=ImageDraw.Draw(halo); r=250+int(18*math.sin(local*2))
-    hd.ellipse((WIDTH/2-r,500-r,WIDTH/2+r,500+r),fill=(255,188,105,38)); layer.alpha_composite(halo.filter(ImageFilter.GaussianBlur(80)))
-    _glow(layer,(WIDTH/2,430),TODDLER,_font(205,True),a,"mm"); _center(d,TAGLINE,675,_font(42),(255,239,220,a))
+    persistent_name(FATHER, 195, "father")
+    persistent_name(MOTHER, 535, "mother")
+
+    # Small unobtrusive cue for the active transformation, no arrow or scene card.
+    active = None
+    for i, start in enumerate((2.0, 3.45, 4.9)):
+        if start <= t < start + .9:
+            active = i
+            break
+    if active is not None:
+        left, right = PAIRINGS[active]
+        cue_alpha = int(190 * min(_ease((t-(2.0,3.45,4.9)[active])/.18), 1))
+        _center(d, f"{left}  +  {right}", 760, _font(35), (255, 220, 175, cue_alpha))
+
+    # Once all mapped characters are gone, the original positions visibly contain
+    # only ITI and KA. Hold that state before convergence.
+    if 5.78 <= t < 7.15:
+        hold = int(255 * min(_ease((t-5.78)/.25), 1))
+        _center(d, "The letters that remain", 790, _font(35), (255, 224, 196, hold))
+
+
+def _draw_final_convergence(layer, t):
+    if t < 7.15:
+        return
+    d = ImageDraw.Draw(layer)
+    local = t - 7.15
+    p = _ease(local / .9)
+    font = _font(170, True)
+    widths = [d.textlength(ch, font=font) for ch in TODDLER]
+    gap = 18
+    target_x = (WIDTH - (sum(widths) + gap * 4)) / 2
+
+    # Source points approximate the persistent ITI and KA glyph positions.
+    sources = [(790, 300), (865, 300), (940, 300), (940, 640), (1025, 640)]
+    x = target_x
+    for i, (ch, width) in enumerate(zip(TODDLER, widths)):
+        sx, sy = sources[i]
+        tx, ty = x, 420
+        px = sx + (tx - sx) * p
+        py = sy + (ty - sy) * p
+        _glow(layer, (px, py), ch, font, 255)
+        x += width + gap
+
+    if local >= .9:
+        # Cover the old source-name area softly once the letters have converged,
+        # while preserving the same moving background so the shot remains continuous.
+        veil = Image.new("RGBA", layer.size)
+        vd = ImageDraw.Draw(veil)
+        va = int(150 * min((local-.9)/.35, 1))
+        vd.rounded_rectangle((500, 110, 1420, 720), radius=80, fill=(74, 32, 50, va))
+        layer.alpha_composite(veil.filter(ImageFilter.GaussianBlur(35)))
+
+        hero_a = int(255 * min((local-.9)/.3, 1))
+        _glow(layer, (WIDTH/2, 430), TODDLER, _font(205, True), hero_a, "mm")
+        _center(d, TAGLINE, 675, _font(42), (255, 239, 220, hero_a))
 
 def make_frame(t):
     base=_bg(t); layer=Image.new("RGBA",(WIDTH,HEIGHT)); _intro(layer,t); _extract(layer,t); _assemble(layer,t); _hero(layer,t)
