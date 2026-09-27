@@ -23,6 +23,8 @@ FATHER = "NITISH"
 MOTHER = "SNEHANKITHA"
 TODDLER = "ITIKA"
 PAIRINGS = (("N", "SNE"), ("S", "HAN"), ("H", "ITH"))
+FATHER_REMAINDER = "ITI"
+MOTHER_REMAINDER = "KA"
 TAGLINE = "A name born from two names, united by love."
 
 
