@@ -108,7 +108,7 @@ def _draw_pairing(layer: Image.Image, t: float, index: int, start: float) -> Non
     d.line((x1, y1, xe, y2), fill=gold, width=5)
     d.ellipse((x1-9, y1-9, x1+9, y1+9), fill=gold)
     d.ellipse((xe-9, y2-9, xe+9, y2+9), fill=gold)
-    _center(d, f"{left} from {FATHER}     {right} from {MOTHER}", 690, _font(31), (255, 229, 195, int(a*.82)))
+    _center(\n        d,\n        f"{left} from {FATHER}     {right} from {MOTHER}",\n        690,\n        _font(31),\n        (255, 229, 195, int(a * 0.82)),\n    )\n\n    # Keep the accumulating leftovers visible so the derivation is understandable.\n    father_left = ("ITISH", "ITI H", FATHER_REMAINDER)[index].replace(" ", "")\n    mother_left = ("HANKITHA", "KITHA", MOTHER_REMAINDER)[index]\n    _center(\n        d,\n        f"Remaining:  {father_left}  +  {mother_left}",\n        765,\n        _font(36, True),\n        (255, 221, 168, int(a * 0.9)),\n    )
 
 
 def _draw_final(layer: Image.Image, t: float) -> None:
