@@ -173,8 +173,11 @@ def _draw_final_convergence(layer, t):
         _center(d, TAGLINE, 675, _font(42), (255, 239, 220, hero_a))
 
 def make_frame(t):
-    base=_bg(t); layer=Image.new("RGBA",(WIDTH,HEIGHT)); _intro(layer,t); _extract(layer,t); _assemble(layer,t); _hero(layer,t)
-    return np.asarray(Image.alpha_composite(base,layer).convert("RGB"))
+    base = _bg(t)
+    layer = Image.new("RGBA", (WIDTH, HEIGHT))
+    _draw_continuous_story(layer, t)
+    _draw_final_convergence(layer, t)
+    return np.asarray(Image.alpha_composite(base, layer).convert("RGB"))
 
 def render(output_path,fps=FPS):
     out=Path(output_path).resolve(); out.parent.mkdir(parents=True,exist_ok=True)
