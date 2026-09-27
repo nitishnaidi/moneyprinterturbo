@@ -69,8 +69,9 @@ def _draw_continuous_story(layer, t):
     chrome_alpha = alpha
     if t >= 6.9:
         chrome_alpha = int(alpha * (1 - _ease((t - 6.9) / .45)))
-    _center(d, "FATHER", 145, _font(27, True), (255, 205, 150, int(chrome_alpha * .82)))
-    _center(d, "MOTHER", 485, _font(27, True), (255, 205, 150, int(chrome_alpha * .82)))
+    if t < 7.15:
+        _center(d, "FATHER", 145, _font(27, True), (255, 205, 150, int(chrome_alpha * .82)))
+        _center(d, "MOTHER", 485, _font(27, True), (255, 205, 150, int(chrome_alpha * .82)))
 
     # Removal windows. A mapped glyph glows, then dissolves while every other glyph
     # stays anchored to its original location. This makes the derivation readable.
@@ -126,6 +127,11 @@ def _draw_continuous_story(layer, t):
 
     persistent_name(FATHER, 195, "father")
     persistent_name(MOTHER, 535, "mother")
+
+    # Final handoff: after this instant the source scene contributes nothing.
+    # Only _draw_final_convergence renders the five surviving letters and final title.
+    if t >= 7.15:
+        return
 
     # Mapping arrow is an overlay only. Source letters remain anchored.
     active = None
