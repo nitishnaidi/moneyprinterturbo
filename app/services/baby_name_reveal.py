@@ -76,7 +76,7 @@ def _draw_continuous_story(layer, t):
         (3.45, "father", (4,)),      # S
         (3.45, "mother", (3, 4, 5)), # HAN
         (4.9, "father", (5,)),       # H
-        (4.9, "mother", (6, 7, 8)),  # ITH
+        (4.9, "mother", (7, 8, 9)),  # ITH
     )
 
     def glyph_alpha(group, idx):
