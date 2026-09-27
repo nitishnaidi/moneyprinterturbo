@@ -65,8 +65,12 @@ def _draw_continuous_story(layer, t):
     d = ImageDraw.Draw(layer)
     # Gentle fade-in only. No scene-level fade-outs or card refreshes.
     alpha = int(255 * min(_ease(t / .55), 1.0))
-    _center(d, "FATHER", 145, _font(27, True), (255, 205, 150, int(alpha * .82)))
-    _center(d, "MOTHER", 485, _font(27, True), (255, 205, 150, int(alpha * .82)))
+    # Fade all source-scene chrome away as convergence begins.
+    chrome_alpha = alpha
+    if t >= 6.9:
+        chrome_alpha = int(alpha * (1 - _ease((t - 6.9) / .45)))
+    _center(d, "FATHER", 145, _font(27, True), (255, 205, 150, int(chrome_alpha * .82)))
+    _center(d, "MOTHER", 485, _font(27, True), (255, 205, 150, int(chrome_alpha * .82)))
 
     # Removal windows. A mapped glyph glows, then dissolves while every other glyph
     # stays anchored to its original location. This makes the derivation readable.
@@ -142,6 +146,8 @@ def _draw_continuous_story(layer, t):
     # only ITI and KA. Hold that state before convergence.
     if 5.78 <= t < 7.15:
         hold = int(255 * min(_ease((t-5.78)/.25), 1))
+        if t >= 6.9:
+            hold = int(hold * (1 - _ease((t-6.9)/.25)))
         _center(d, "The letters that remain", 790, _font(35), (255, 224, 196, hold))
 
 
