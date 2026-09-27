@@ -7,7 +7,7 @@ class TestBabyNameReveal(unittest.TestCase):
     def test_exact_text_contract(self):
         self.assertEqual(reveal.FATHER, "NITISH")
         self.assertEqual(reveal.MOTHER, "SNEHANKITHA")
-        self.assertEqual(reveal.TODDLER, "ITIKA")
+        self.assertEqual(reveal.TODDLER, "ITIKA")\n        self.assertEqual(reveal.FATHER_REMAINDER, "ITI")\n        self.assertEqual(reveal.MOTHER_REMAINDER, "KA")\n        self.assertEqual(\n            reveal.FATHER_REMAINDER + reveal.MOTHER_REMAINDER, reveal.TODDLER\n        )
         self.assertEqual(
             reveal.PAIRINGS,
             (("N", "SNE"), ("S", "HAN"), ("H", "ITH")),
