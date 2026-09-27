@@ -100,11 +100,22 @@ def _draw_continuous_story(layer, t):
         widths = [d.textlength(ch, font=font) for ch in text]
         gap = 8
         x = (WIDTH - (sum(widths) + gap * (len(text)-1))) / 2
+        father_survivors = {1, 2, 3}
+        mother_survivors = {6, 10}
+        survivor_set = father_survivors if group == "father" else mother_survivors
+        # Once convergence starts, the source copies disappear so each survivor
+        # exists only once as it travels toward the final name.
+        source_alpha = alpha if t < 7.15 else 0
         for i, (ch, width) in enumerate(zip(text, widths)):
             ga, glowing = glyph_alpha(group, i)
+            ga = min(ga, source_alpha)
             if ga > 0:
                 if glowing:
                     _glow(layer, (x, y), ch, font, ga)
+                elif i in survivor_set and t >= 5.78:
+                    # Cool ivory/rose accent distinguishes the five survivors.
+                    d.text((x, y), ch, font=font, fill=(245, 205, 220, ga),
+                           stroke_width=2, stroke_fill=(185, 105, 135, ga))
                 else:
                     d.text((x, y), ch, font=font, fill=(255, 239, 219, ga))
             x += width + gap
@@ -112,8 +123,7 @@ def _draw_continuous_story(layer, t):
     persistent_name(FATHER, 195, "father")
     persistent_name(MOTHER, 535, "mother")
 
-    # V2-style mapping cue, now drawn only as an overlay on the persistent names.
-    # The names themselves never refresh or move. Mapped glyphs dissolve in-place.
+    # Mapping arrow is an overlay only. Source letters remain anchored.
     active = None
     starts = (2.0, 3.45, 4.9)
     for i, start in enumerate(starts):
@@ -123,12 +133,10 @@ def _draw_continuous_story(layer, t):
     if active is not None:
         left, right = PAIRINGS[active]
         local = t - starts[active]
-        cue_alpha = int(220 * min(_ease(local/.16), _ease((.9-local)/.16), 1))
-        arrow_font = _font(46, True)
-        label_font = _font(34, True)
-        # Keep the mapping indication visually separate from the source names.
-        _center(d, f"{left}     →     {right}", 760, arrow_font, (255, 222, 166, cue_alpha))
-        _center(d, "mapped letters disappear", 825, label_font, (255, 232, 205, int(cue_alpha*.72)))
+        cue_alpha = int(235 * min(_ease(local/.14), _ease((.9-local)/.14), 1))
+        # Strong central arrow with compact labels, readable without looking like a slide.
+        _center(d, f"{left}     →     {right}", 750, _font(52, True),
+                (255, 220, 150, cue_alpha))
 
     # Once all mapped characters are gone, the original positions visibly contain
     # only ITI and KA. Hold that state before convergence.
@@ -142,35 +150,42 @@ def _draw_final_convergence(layer, t):
         return
     d = ImageDraw.Draw(layer)
     local = t - 7.15
-    p = _ease(local / .9)
+    move = _ease(min(local / 1.0, 1.0))
     font = _font(170, True)
     widths = [d.textlength(ch, font=font) for ch in TODDLER]
     gap = 18
     target_x = (WIDTH - (sum(widths) + gap * 4)) / 2
 
-    # Source points approximate the persistent ITI and KA glyph positions.
-    sources = [(790, 300), (865, 300), (940, 300), (940, 640), (1025, 640)]
+    # Approximate centers of the five visible survivors: I T I from father, K A from mother.
+    sources = [(785, 250), (865, 250), (945, 250), (820, 590), (1110, 590)]
     x = target_x
     for i, (ch, width) in enumerate(zip(TODDLER, widths)):
         sx, sy = sources[i]
-        tx, ty = x, 420
-        px = sx + (tx - sx) * p
-        py = sy + (ty - sy) * p
-        _glow(layer, (px, py), ch, font, 255)
+        tx, ty = x, 405
+        px = sx + (tx - sx) * move
+        py = sy + (ty - sy) * move
+        # Blend survivor accent into final warm gold while the letters travel.
+        rose = (245, 205, 220)
+        gold = (255, 232, 170)
+        color = tuple(int(rose[j] + (gold[j]-rose[j])*move) for j in range(3))
+        glow = Image.new("RGBA", layer.size)
+        gd = ImageDraw.Draw(glow)
+        gd.text((px, py), ch, font=font, fill=(*color, 180),
+                stroke_width=9, stroke_fill=(255, 174, 82, int(120*move)))
+        layer.alpha_composite(glow.filter(ImageFilter.GaussianBlur(8)))
+        d.text((px, py), ch, font=font, fill=(*color, 255),
+               stroke_width=1, stroke_fill=(255, 194, 110, 255))
         x += width + gap
 
-    if local >= .9:
-        # Cover the old source-name area softly once the letters have converged,
-        # while preserving the same moving background so the shot remains continuous.
-        veil = Image.new("RGBA", layer.size)
-        vd = ImageDraw.Draw(veil)
-        va = int(150 * min((local-.9)/.35, 1))
-        vd.rounded_rectangle((500, 110, 1420, 720), radius=80, fill=(74, 32, 50, va))
-        layer.alpha_composite(veil.filter(ImageFilter.GaussianBlur(35)))
-
-        hero_a = int(255 * min((local-.9)/.3, 1))
-        _glow(layer, (WIDTH/2, 430), TODDLER, _font(205, True), hero_a, "mm")
-        _center(d, TAGLINE, 675, _font(42), (255, 239, 220, hero_a))
+    # The moving letters themselves ARE the hero name. No second ITIKA layer.
+    if local >= 1.0:
+        hero_a = int(255 * min((local-1.0)/.35, 1))
+        # Subtle halo behind the completed word, not over it.
+        halo = Image.new("RGBA", layer.size)
+        hd = ImageDraw.Draw(halo)
+        hd.ellipse((650, 280, 1270, 690), fill=(255, 185, 95, int(28*hero_a/255)))
+        layer.alpha_composite(halo.filter(ImageFilter.GaussianBlur(75)))
+        _center(d, TAGLINE, 665, _font(42), (255, 239, 220, hero_a))
 
 def make_frame(t):
     base = _bg(t)
