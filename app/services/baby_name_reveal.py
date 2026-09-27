@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 WIDTH, HEIGHT = 1920, 1080
 FPS = 30
-DURATION = 9.5
+DURATION = 10.0
 
 FATHER = "NITISH"
 MOTHER = "SNEHANKITHA"
@@ -25,7 +25,7 @@ TODDLER = "ITIKA"
 PAIRINGS = (("N", "SNE"), ("S", "HAN"), ("H", "ITH"))
 FATHER_REMAINDER = "ITI"
 MOTHER_REMAINDER = "KA"
-TAGLINE = "A name born from two names, united by love."
+TAGLINE = "A name born from two names, united by love."\nSTAGES = (\n    ("N", "SNE", "ITISH", "HANKITHA"),\n    ("S", "HAN", "ITIH", "KITHA"),\n    ("H", "ITH", "ITI", "KA"),\n)
 
 
 def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -79,112 +79,146 @@ def _background(t: float) -> Image.Image:
     return Image.alpha_composite(image, particles)
 
 
-def _draw_intro(layer: Image.Image, t: float) -> None:
-    a = int(255 * _alpha(t, 0.0, 2.25))
-    if not a:
+def _glow_text(layer, xy, text, font, alpha=255, anchor=None):
+    glow = Image.new("RGBA", layer.size)
+    gd = ImageDraw.Draw(glow)
+    for width, opacity in ((18, 32), (10, 55), (5, 90)):
+        gd.text(xy, text, font=font, fill=(255, 196, 105, opacity * alpha // 255),
+                stroke_width=width, stroke_fill=(255, 154, 76, opacity * alpha // 255), anchor=anchor)
+    glow = glow.filter(ImageFilter.GaussianBlur(8))
+    layer.alpha_composite(glow)
+    ImageDraw.Draw(layer).text(xy, text, font=font, fill=(255, 244, 220, alpha),
+                               stroke_width=1, stroke_fill=(255, 202, 130, alpha), anchor=anchor)
+
+
+def _name_layout(draw, text, y, font):
+    widths = [draw.textlength(ch, font=font) for ch in text]
+    gap = 8
+    total = sum(widths) + gap * (len(text) - 1)
+    x = (WIDTH - total) / 2
+    positions = []
+    for ch, width in zip(text, widths):
+        positions.append((ch, x, y, width))
+        x += width + gap
+    return positions
+
+
+def _draw_name_chars(layer, text, y, alpha, highlights=()):
+    d = ImageDraw.Draw(layer)
+    font = _font(102, True)
+    positions = _name_layout(d, text, y, font)
+    for idx, (ch, x, py, _) in enumerate(positions):
+        if idx in highlights:
+            _glow_text(layer, (x, py), ch, font, alpha)
+        else:
+            d.text((x, py), ch, font=font, fill=(255, 239, 219, alpha))
+    return positions
+
+
+def _draw_intro(layer, t):
+    a = int(255 * min(_ease(t / .65), 1))
+    if t > 2.0:
+        a = int(a * max(0, 1 - (t - 2.0) / .35))
+    if a <= 0:
         return
     d = ImageDraw.Draw(layer)
-    gold = (255, 221, 158, a)
-    soft = (255, 239, 218, a)
-    _center(d, "FATHER", 260, _font(34, True), (gold[0], gold[1], gold[2], int(a*.8)))
-    _center(d, FATHER, 310, _font(112, True), soft, 2, (170, 104, 65, a))
-    _center(d, "MOTHER", 535, _font(34, True), (gold[0], gold[1], gold[2], int(a*.8)))
-    _center(d, MOTHER, 585, _font(112, True), soft, 2, (170, 104, 65, a))
+    _center(d, "FATHER", 205, _font(30, True), (255, 210, 155, int(a * .8)))
+    _draw_name_chars(layer, FATHER, 255, a)
+    _center(d, "MOTHER", 520, _font(30, True), (255, 210, 155, int(a * .8)))
+    _draw_name_chars(layer, MOTHER, 570, a)
+    _center(d, "Two names. One little miracle.", 785, _font(40), (255, 229, 210, int(a * .9)))
 
 
-def _draw_pairing(layer: Image.Image, t: float, index: int, start: float) -> None:
-    end = start + 1.55
-    a = int(255 * _alpha(t, start, end, .22))
-    if not a:
-        return
-    left, right = PAIRINGS[index]
+def _bezier(p0, p1, p2, u):
+    v = 1 - u
+    return (v*v*p0[0] + 2*v*u*p1[0] + u*u*p2[0],
+            v*v*p0[1] + 2*v*u*p1[1] + u*u*p2[1])
+
+
+def _trail(layer, p0, p2, progress, alpha):
     d = ImageDraw.Draw(layer)
-    gold = (255, 215, 132, a)
-    white = (255, 246, 229, a)
-    d.text((385, 455), left, font=_font(138, True), fill=white)
-    d.text((1290, 455), right, font=_font(138, True), fill=white)
-    d.text((880, 474), "→", font=_font(105, True), fill=gold)
-    progress = _ease((t - start) / .65)
-    x1, y1, x2, y2 = 555, 535, 1260, 535
-    xe = x1 + (x2 - x1) * progress
-    d.line((x1, y1, xe, y2), fill=gold, width=5)
-    d.ellipse((x1-9, y1-9, x1+9, y1+9), fill=gold)
-    d.ellipse((xe-9, y2-9, xe+9, y2+9), fill=gold)
-    _center(
-        d,
-        f"{left} from {FATHER}     {right} from {MOTHER}",
-        690,
-        _font(31),
-        (255, 229, 195, int(a * 0.82)),
-    )
-
-    # Keep the accumulating leftovers visible so the derivation is understandable.
-    father_left = ("ITISH", "ITIH", FATHER_REMAINDER)[index]
-    mother_left = ("HANKITHA", "KITHA", MOTHER_REMAINDER)[index]
-    _center(
-        d,
-        f"Remaining:  {father_left}  +  {mother_left}",
-        765,
-        _font(36, True),
-        (255, 221, 168, int(a * 0.9)),
-    )
+    p1 = ((p0[0] + p2[0]) / 2, min(p0[1], p2[1]) - 170)
+    points = [_bezier(p0, p1, p2, i / 36) for i in range(max(2, int(36 * progress)))]
+    if len(points) > 1:
+        for width, opacity in ((18, 25), (8, 70), (3, 180)):
+            d.line(points, fill=(255, 189, 100, opacity * alpha // 255), width=width)
+        x, y = points[-1]
+        d.ellipse((x-8, y-8, x+8, y+8), fill=(255, 239, 188, alpha))
 
 
-def _draw_final(layer: Image.Image, t: float) -> None:
-    start = 6.65
-    if t < start:
+def _draw_extraction(layer, t):
+    # Each stage keeps both complete source names visible. The selected father letter
+    # and mother segment glow in-place first, then a curved light path connects them.
+    starts = (2.05, 3.45, 4.85)
+    active = next((i for i, s in enumerate(starts) if s <= t < s + 1.45), None)
+    if active is None:
+        return
+    s = starts[active]
+    local = t - s
+    a = int(255 * min(_ease(local / .18), _ease((1.45-local)/.18), 1))
+    d = ImageDraw.Draw(layer)
+    father_letter, mother_segment, father_left, mother_left = STAGES[active]
+    f_indices = [FATHER.index(father_letter, sum(1 for j in range(active) if STAGES[j][0] == father_letter))]
+    segment_start = MOTHER.find(mother_segment)
+    m_indices = list(range(segment_start, segment_start + len(mother_segment)))
+    _center(d, "FATHER", 150, _font(27, True), (255, 205, 150, int(a*.75)))
+    fp = _draw_name_chars(layer, FATHER, 195, a, f_indices)
+    _center(d, "MOTHER", 485, _font(27, True), (255, 205, 150, int(a*.75)))
+    mp = _draw_name_chars(layer, MOTHER, 530, a, m_indices)
+    fx = fp[f_indices[0]][1] + fp[f_indices[0]][3]/2
+    mx = (mp[m_indices[0]][1] + mp[m_indices[-1]][1] + mp[m_indices[-1]][3]) / 2
+    progress = _ease((local-.18)/.55)
+    _trail(layer, (fx, 310), (mx, 520), progress, a)
+    if local > .68:
+        ra = int(a * min((local-.68)/.22, 1))
+        _center(d, f"remaining  {father_left}   +   {mother_left}", 775,
+                _font(48, True), (255, 224, 178, ra))
+
+
+def _draw_assembly(layer, t):
+    if t < 6.25:
         return
     d = ImageDraw.Draw(layer)
-    progress = _ease((t - start) / 1.0)
-    font = _font(164, True)
-    widths = [d.textlength(c, font=font) for c in TODDLER]
-    gap = 24
-    total = sum(widths) + gap * (len(TODDLER)-1)
-    target_x = (WIDTH-total)/2
-    starts = [250, 600, 960, 1320, 1650]
-    x = target_x
-    for i, char in enumerate(TODDLER):
+    local = t - 6.25
+    if local < .8:
+        a = int(255 * min(local/.22, 1))
+        _center(d, "The letters that remained...", 230, _font(38), (255, 224, 202, a))
+        _glow_text(layer, (710, 455), FATHER_REMAINDER, _font(112, True), a, "mm")
+        _glow_text(layer, (1210, 455), MOTHER_REMAINDER, _font(112, True), a, "mm")
+        _center(d, "+", 410, _font(92), (255, 215, 150, a))
+        return
+
+    progress = _ease((local-.8)/.9)
+    font = _font(168, True)
+    widths = [d.textlength(ch, font=font) for ch in TODDLER]
+    gap = 18
+    total = sum(widths) + gap*(len(widths)-1)
+    target = (WIDTH-total)/2
+    sources = [(660,430),(735,430),(810,430),(1165,430),(1245,430)]
+    x = target
+    for i, (ch, width) in enumerate(zip(TODDLER, widths)):
+        sx, sy = sources[i]
         tx = x
-        sx = starts[i]
         px = sx + (tx-sx)*progress
-        py = 450 + (i % 2 * 110 - 55)*(1-progress)
-        opacity = int(255 * min((t-start)/.35, 1))
-        d.text((px, py), char, font=font, fill=(255, 231, 177, opacity), stroke_width=2, stroke_fill=(173, 103, 57, opacity))
-        x += widths[i] + gap
-    if t >= 7.45:
-        a = int(255 * min((t-7.45)/.5, 1))
-        _center(d, TAGLINE, 720, _font(43), (255, 239, 221, a))
+        py = sy + (430-sy)*progress
+        _glow_text(layer, (px, py), ch, font, 255)
+        x += width + gap
 
 
-def make_frame(t: float) -> np.ndarray:
-    base = _background(t)
-    overlay = Image.new("RGBA", (WIDTH, HEIGHT))
-    _draw_intro(overlay, t)
-    for idx, start in enumerate((2.05, 3.55, 5.05)):
-        _draw_pairing(overlay, t, idx, start)
-    _draw_final(overlay, t)
-    composed = Image.alpha_composite(base, overlay).convert("RGB")
-    return np.asarray(composed)
+def _draw_hero(layer, t):
+    if t < 8.0:
+        return
+    local = t - 8.0
+    a = int(255 * min(local/.4, 1))
+    d = ImageDraw.Draw(layer)
+    pulse = 1 + .025 * math.sin(local * 3.0)
+    font = _font(int(205*pulse), True)
+    _glow_text(layer, (WIDTH/2, 405), TODDLER, font, a, "mm")
+    _center(d, TAGLINE, 675, _font(42), (255, 238, 218, int(a*.95)))
+    # A restrained halo makes the final name feel like a hero reveal rather than a title card.
+    halo = Image.new("RGBA", layer.size)
+    hd = ImageDraw.Draw(halo)
+    r = 220 + int(15*math.sin(local*2))
+    hd.ellipse((WIDTH/2-r, 515-r, WIDTH/2+r, 515+r), fill=(255,190,115,32))
+    layer.alpha_composite(halo.filter(ImageFilter.GaussianBlur(75)))
 
-
-def render(output_path: str, fps: int = FPS) -> str:
-    output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    clip = VideoClip(make_frame, duration=DURATION)
-    try:
-        clip.write_videofile(str(output), fps=fps, codec="libx264", audio=False, preset="medium", pixel_format="yuv420p")
-    finally:
-        clip.close()
-    return str(output)
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Render the cinematic baby-name reveal template.")
-    parser.add_argument("--output", default="baby-name-reveal.mp4")
-    parser.add_argument("--fps", type=int, default=FPS)
-    args = parser.parse_args()
-    render(args.output, args.fps)
-
-
-if __name__ == "__main__":
-    main()
